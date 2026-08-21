@@ -2,11 +2,25 @@ const SPREADSHEET_ID = '1PvNRR9uekifW7O-cmxh78bOWpYMuYhk3VtK76FGy6BE';
 const SOURCE_GID = 1541790103;
 const MAX_HEADER_SCAN_ROWS = 40;
 
-function doGet() {
-  return HtmlService.createTemplateFromFile('Index')
-    .evaluate()
-    .setTitle('Factory Capacity Dashboard')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+function doGet(e) {
+  const action = String((e && e.parameter && e.parameter.action) || '').trim().toLowerCase();
+  if (action === 'capacity') {
+    const data = getCapacityData();
+    const callback = String((e && e.parameter && e.parameter.callback) || '').trim();
+    const json = JSON.stringify(data);
+    if (callback && /^[A-Za-z_$][0-9A-Za-z_$\.]*$/.test(callback)) {
+      return ContentService.createTextOutput(callback + '(' + json + ');')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    return ContentService.createTextOutput(json)
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  return ContentService.createTextOutput(JSON.stringify({
+    ok: true,
+    service: 'Capacity System API',
+    message: 'Use ?action=capacity'
+  })).setMimeType(ContentService.MimeType.JSON);
 }
 
 function getCapacityData() {
@@ -41,7 +55,6 @@ function getCapacityData() {
         let process = clean_(getByAlias_(row, header.map, ALIASES.process));
         let step = clean_(getByAlias_(row, header.map, ALIASES.step));
 
-        // Support merged-cell style sheets where repeated values are blank.
         if (!partNo && (process || step)) partNo = lastPartNo;
         if (!partName && partNo === lastPartNo) partName = lastPartName;
         if (!process && step) process = lastProcess;
@@ -70,6 +83,7 @@ function getCapacityData() {
           ct,
           outputCycle,
           efficiency,
+          eff: efficiency,
           hoursPerShift,
           shiftsPerDay,
           status: clean_(getByAlias_(row, header.map, ALIASES.status)) || 'Active',
